@@ -8,47 +8,19 @@ import { markdown } from '@codemirror/lang-markdown';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { dracula } from '@uiw/codemirror-theme-dracula';
 import { EditorView } from '@codemirror/view';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import {
-  Bot,
-  Boxes,
-  Bug,
-  CheckCircle2,
-  ChevronDown,
-  ChevronRight,
-  Code2,
-  Command,
-  Copy,
-  Database,
-  Edit3,
-  FileCode2,
-  FileJson,
-  FileText,
-  Folder,
-  FolderOpen,
-  GitBranch,
-  GripVertical,
-  LayoutPanelLeft,
-  Lightbulb,
-  Maximize2,
-  Minus,
-  Moon,
-  Play,
-  Plus,
-  RefreshCw,
-  Search,
-  Settings,
-  Sparkles,
-  SplitSquareHorizontal,
-  Sun,
-  Terminal,
-  Type,
-  WrapText,
-  X,
-  Zap,
+  Bot, Boxes, Bug, CheckCircle2, ChevronDown, ChevronRight, Code2, Command,
+  Copy, Database, Edit3, FileCode2, FileJson, FileText, Folder, FolderOpen,
+  GitBranch, GripVertical, LayoutPanelLeft, Lightbulb, Maximize2, Minus,
+  Moon, Play, Plus, RefreshCw, Search, Settings, Sparkles, SplitSquareHorizontal,
+  Sun, Terminal, Type, WrapText, X, Zap,
 } from 'lucide-react';
+import { streamGeminiCodeReview } from './geminiChat';
 import './styles.css';
 
-const STORAGE_KEY = 'ai-code-studio-pro-v2';
+const STORAGE_KEY = 'ai-code-studio-pro-v5';
 
 const themeOptions = [
   { id: 'dark', label: 'Dark' },
@@ -177,7 +149,7 @@ export function createHint(input: string): AssistantHint {
         language: 'markdown',
         content: `# AI Code Studio
 
-A frontend-only real-time IDE simulation with editable files, localStorage persistence, AI code review, sidebar tools, keyboard shortcuts, themes, and simulated run output.`,
+A frontend-only real-time IDE with editable files, Gemini streaming AI chat, localStorage persistence, shortcuts, themes, and simulated run output.`,
       },
     ],
   },
@@ -247,11 +219,11 @@ function App() {
   const [wordWrap, setWordWrap] = useState(stored.wordWrap ?? true);
   const [fontSize, setFontSize] = useState(stored.fontSize || 15);
   const [searchQuery, setSearchQuery] = useState(stored.searchQuery || '');
+  const [editorPositions, setEditorPositions] = useState(stored.editorPositions || {});
   const [palette, setPalette] = useState(null);
   const [draggedId, setDraggedId] = useState(null);
   const [renamingId, setRenamingId] = useState(null);
   const [renameValue, setRenameValue] = useState('');
-
   const assistantInputRef = useRef(null);
 
   const tabs = openTabs.map((id) => openableFiles.find((file) => file.id === id)).filter(Boolean);
@@ -261,43 +233,15 @@ function App() {
     localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
-        theme,
-        files,
-        activeSidebar,
-        sidebarVisible,
-        consoleVisible,
-        openTabs,
-        activeFileId,
-        leftWidth,
-        rightWidth,
-        consoleHeight,
-        chatInput,
-        assistantMode,
-        messages,
-        consoleEntries,
-        wordWrap,
-        fontSize,
-        searchQuery,
+        theme, files, activeSidebar, sidebarVisible, consoleVisible, openTabs, activeFileId,
+        leftWidth, rightWidth, consoleHeight, chatInput, assistantMode, messages, consoleEntries,
+        wordWrap, fontSize, searchQuery, editorPositions,
       }),
     );
   }, [
-    theme,
-    files,
-    activeSidebar,
-    sidebarVisible,
-    consoleVisible,
-    openTabs,
-    activeFileId,
-    leftWidth,
-    rightWidth,
-    consoleHeight,
-    chatInput,
-    assistantMode,
-    messages,
-    consoleEntries,
-    wordWrap,
-    fontSize,
-    searchQuery,
+    theme, files, activeSidebar, sidebarVisible, consoleVisible, openTabs, activeFileId,
+    leftWidth, rightWidth, consoleHeight, chatInput, assistantMode, messages, consoleEntries,
+    wordWrap, fontSize, searchQuery, editorPositions,
   ]);
 
   useEffect(() => {
@@ -371,38 +315,34 @@ function App() {
     setSidebarVisible(true);
   }
 
-  const openFile = (fileId) => {
+  function openFile(fileId) {
     setOpenTabs((current) => (current.includes(fileId) ? current : [...current, fileId]));
     setActiveFileId(fileId);
-  };
+  }
 
   function closeTab(fileId) {
     setOpenTabs((current) => {
       const next = current.filter((id) => id !== fileId);
-
-      if (activeFileId === fileId) {
-        setActiveFileId(next[next.length - 1] || null);
-      }
-
+      if (activeFileId === fileId) setActiveFileId(next[next.length - 1] || null);
       return next;
     });
   }
 
-  const toggleFolder = (id) => {
+  function toggleFolder(id) {
     setFiles((current) => updateTree(current, id, (node) => ({ ...node, expanded: !node.expanded })));
-  };
+  }
 
-  const updateFileContent = (fileId, content) => {
+  function updateFileContent(fileId, content) {
     setFiles((current) => updateTree(current, fileId, (node) => ({ ...node, content })));
-  };
+  }
 
-  const beginRename = (file) => {
+  function beginRename(file) {
     if (!file) return;
     setRenamingId(file.id);
     setRenameValue(file.name);
-  };
+  }
 
-  const commitRename = () => {
+  function commitRename() {
     const cleanName = renameValue.trim();
 
     if (!renamingId || !cleanName) {
@@ -421,9 +361,9 @@ function App() {
     setConsoleVisible(true);
     setConsoleEntries((current) => [...current, { type: 'success', text: `[rename] file renamed to ${cleanName}` }]);
     setRenamingId(null);
-  };
+  }
 
-  const createNewFile = () => {
+  function createNewFile() {
     const name = window.prompt('New file name', 'new-file.js');
     if (!name) return;
 
@@ -445,9 +385,9 @@ function App() {
 
     setOpenTabs((current) => [...current, newFile.id]);
     setActiveFileId(newFile.id);
-  };
+  }
 
-  const moveFileToFolder = (fileId, targetFolderId) => {
+  function moveFileToFolder(fileId, targetFolderId) {
     let movingFile = null;
 
     const remove = (nodes) =>
@@ -458,33 +398,23 @@ function App() {
             return null;
           }
 
-          return {
-            ...node,
-            children: node.children ? remove(node.children) : node.children,
-          };
+          return { ...node, children: node.children ? remove(node.children) : node.children };
         })
         .filter(Boolean);
 
     const insert = (nodes) =>
       nodes.map((node) => {
         if (node.id === targetFolderId && node.type === 'folder' && movingFile) {
-          return {
-            ...node,
-            expanded: true,
-            children: [...(node.children || []), movingFile],
-          };
+          return { ...node, expanded: true, children: [...(node.children || []), movingFile] };
         }
 
-        return {
-          ...node,
-          children: node.children ? insert(node.children) : node.children,
-        };
+        return { ...node, children: node.children ? insert(node.children) : node.children };
       });
 
     setFiles(insert(remove(files)));
-  };
+  }
 
-  const askAssistant = () => {
+  async function askAssistant() {
     if (!activeFile) {
       setMessages((current) => [
         ...current,
@@ -498,21 +428,67 @@ function App() {
     }
 
     const question = chatInput.trim() || 'Review this file.';
-    const answer = analyzeCode(activeFile, question, assistantMode);
+    const aiMessageId = `ai-${Date.now()}`;
 
     setMessages((current) => [
       ...current,
       { role: 'user', text: question, time: nowTime() },
-      { role: 'ai', text: answer, time: nowTime() },
+      {
+        id: aiMessageId,
+        role: 'ai',
+        text: 'Thinking...',
+        time: nowTime(),
+      },
     ]);
 
     setConsoleVisible(true);
     setConsoleEntries((current) => [
       ...current,
-      { type: 'command', text: `$ ai analyze ${activeFile.name}` },
-      { type: 'success', text: `[ai] reviewed current editor content from ${activeFile.name}` },
+      { type: 'command', text: `$ gemini stream ${activeFile.name}` },
+      { type: 'info', text: '[ai] streaming Gemini response...' },
     ]);
-  };
+
+    try {
+      await streamGeminiCodeReview({
+        file: activeFile,
+        question,
+        mode: assistantMode,
+        onChunk: (_chunk, fullText) => {
+          setMessages((current) =>
+            current.map((message) =>
+              message.id === aiMessageId
+                ? { ...message, text: fullText }
+                : message,
+            ),
+          );
+        },
+      });
+
+      setConsoleEntries((current) => [
+        ...current,
+        { type: 'success', text: `[ai] Gemini finished reviewing ${activeFile.name}` },
+      ]);
+    } catch (error) {
+      const fallback = analyzeCode(activeFile, question, assistantMode);
+
+      setMessages((current) =>
+        current.map((message) =>
+          message.id === aiMessageId
+            ? {
+                ...message,
+                text: `Gemini API failed, so I used local mock analysis instead.\n\n${fallback}`,
+              }
+            : message,
+        ),
+      );
+
+      setConsoleEntries((current) => [
+        ...current,
+        { type: 'error', text: `[ai] ${error.message}` },
+        { type: 'warn', text: '[ai] fallback mock assistant used' },
+      ]);
+    }
+  }
 
   function runCurrentFile(file = activeFile) {
     setConsoleVisible(true);
@@ -537,7 +513,7 @@ function App() {
     ]);
   }
 
-  const refreshWorkspace = () => {
+  function refreshWorkspace() {
     localStorage.removeItem(STORAGE_KEY);
     setTheme('dark');
     setFiles(initialFiles);
@@ -555,14 +531,15 @@ function App() {
     setWordWrap(true);
     setFontSize(15);
     setSearchQuery('');
+    setEditorPositions({});
     setConsoleEntries([
       { type: 'command', text: '$ workspace refresh' },
       { type: 'success', text: 'Workspace reset successfully' },
       { type: 'info', text: 'No file is open. Use Quick Open or Explorer to start.' },
     ]);
-  };
+  }
 
-  const runCommand = (id) => {
+  function runCommand(id) {
     const actions = {
       run: () => runCurrentFile(),
       save: saveWorkspace,
@@ -581,7 +558,7 @@ function App() {
 
     actions[id]?.();
     setPalette(null);
-  };
+  }
 
   return (
     <div className={`${theme} app-theme-${theme}`}>
@@ -596,11 +573,7 @@ function App() {
         />
 
         <main className="flex h-[calc(100vh-44px)] min-w-0">
-          <ActivityRail
-            active={activeSidebar}
-            visible={sidebarVisible}
-            onSelect={(id) => showSidebar(id)}
-          />
+          <ActivityRail active={activeSidebar} visible={sidebarVisible} onSelect={(id) => showSidebar(id)} />
 
           {sidebarVisible && (
             <ResizablePanel width={leftWidth} min={232} max={420} side="left" onResize={setLeftWidth}>
@@ -655,6 +628,13 @@ function App() {
                       theme={theme}
                       wordWrap={wordWrap}
                       fontSize={fontSize}
+                      position={editorPositions[activeFile.id]}
+                      onPositionChange={(position) =>
+                        setEditorPositions((current) => ({
+                          ...current,
+                          [activeFile.id]: position,
+                        }))
+                      }
                       onChange={(value) => updateFileContent(activeFile.id, value)}
                     />
                   </>
@@ -708,7 +688,6 @@ function TopBar({ theme, setTheme, onShortcuts, onRefresh, onRun, onCommand }) {
           </div>
           <span className="truncate">AI Code Studio</span>
         </div>
-
         <div className="hidden items-center gap-1 text-xs text-[var(--muted)] md:flex">
           <GitBranch size={14} />
           feature/realtime-editor
@@ -728,9 +707,7 @@ function TopBar({ theme, setTheme, onShortcuts, onRefresh, onRun, onCommand }) {
           title="Theme"
         >
           {themeOptions.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.label}
-            </option>
+            <option key={item.id} value={item.id}>{item.label}</option>
           ))}
         </select>
 
@@ -808,7 +785,7 @@ function Explorer({ files, activeFileId, onOpen, onToggle, onMoveFile, draggedId
       </div>
 
       <div className="border-t border-[var(--border)] p-3 text-xs text-[var(--muted)]">
-        Editable files, sidebar actions, themes, and shortcuts are saved locally.
+        Files, layout, themes, AI messages, and editor positions are saved locally.
       </div>
     </div>
   );
@@ -825,7 +802,6 @@ function SearchPanel({ openableFiles, searchQuery, setSearchQuery, onOpen }) {
   return (
     <div className="flex h-full flex-col">
       <PanelHeader title="Search" />
-
       <div className="border-b border-[var(--border)] p-3">
         <input
           autoFocus
@@ -839,16 +815,13 @@ function SearchPanel({ openableFiles, searchQuery, setSearchQuery, onOpen }) {
       <div className="min-h-0 flex-1 overflow-auto p-2">
         {!searchQuery && <Empty text="Type to search all local files." />}
         {searchQuery && matches.length === 0 && <Empty text="No matches found." />}
-
         {matches.map((item, index) => (
           <button
             key={`${item.file.id}-${index}`}
             onClick={() => onOpen(item.file.id)}
             className="mb-2 w-full rounded border border-[var(--border)] bg-[var(--soft-bg)] p-2 text-left text-xs hover:border-indigo-500"
           >
-            <div className="font-semibold">
-              {item.file.name}:{item.index}
-            </div>
+            <div className="font-semibold">{item.file.name}:{item.index}</div>
             <div className="mt-1 truncate text-[var(--muted)]">{item.line.trim()}</div>
           </button>
         ))}
@@ -861,14 +834,9 @@ function SourcePanel({ openableFiles }) {
   return (
     <div className="flex h-full flex-col">
       <PanelHeader title="Source Control" />
-
       <div className="space-y-2 p-3 text-sm">
-        <button className="h-9 w-full rounded bg-indigo-600 font-semibold text-white">
-          Commit mock changes
-        </button>
-
+        <button className="h-9 w-full rounded bg-indigo-600 font-semibold text-white">Commit mock changes</button>
         <div className="text-xs uppercase tracking-wide text-[var(--muted)]">Changes</div>
-
         {openableFiles.slice(0, 5).map((file) => (
           <div key={file.id} className="flex items-center gap-2 rounded bg-[var(--soft-bg)] p-2 text-xs">
             <GitBranch size={14} className="text-emerald-500" />
@@ -884,24 +852,15 @@ function DebugPanel({ onRun, onAsk }) {
   return (
     <div className="flex h-full flex-col">
       <PanelHeader title="Run And Debug" />
-
       <div className="space-y-3 p-3 text-sm">
-        <button
-          onClick={onRun}
-          className="flex h-10 w-full items-center justify-center gap-2 rounded bg-emerald-600 font-semibold text-white"
-        >
+        <button onClick={onRun} className="flex h-10 w-full items-center justify-center gap-2 rounded bg-emerald-600 font-semibold text-white">
           <Play size={16} />
           Run Active File
         </button>
-
-        <button
-          onClick={onAsk}
-          className="flex h-10 w-full items-center justify-center gap-2 rounded bg-indigo-600 font-semibold text-white"
-        >
+        <button onClick={onAsk} className="flex h-10 w-full items-center justify-center gap-2 rounded bg-indigo-600 font-semibold text-white">
           <Bot size={16} />
           Ask AI To Debug
         </button>
-
         <div className="rounded border border-[var(--border)] bg-[var(--soft-bg)] p-3 text-xs leading-5">
           Breakpoints, call stack, watch values, and runtime logs are simulated on the frontend.
         </div>
@@ -911,18 +870,17 @@ function DebugPanel({ onRun, onAsk }) {
 }
 
 function ToolsPanel() {
-  const tools = ['Prettier Formatter', 'ESLint Hints', 'GitLens Mock', 'AI Reviewer', 'Tailwind Helper'];
+  const tools = ['Gemini Streaming AI Chat', 'Prettier Formatter', 'ESLint Hints', 'GitLens Mock', 'Tailwind Helper'];
 
   return (
     <div className="flex h-full flex-col">
       <PanelHeader title="Extensions" />
-
       <div className="space-y-2 p-3">
         {tools.map((tool, index) => (
           <div key={tool} className="rounded border border-[var(--border)] bg-[var(--soft-bg)] p-3 text-sm">
             <div className="font-semibold">{tool}</div>
             <div className="mt-1 text-xs text-[var(--muted)]">
-              {index % 2 ? 'Enabled' : 'Installed'} for this mock workspace.
+              {index === 0 ? 'Uses VITE_GEMINI_API_KEY and streams responses when available.' : 'Enabled for this mock workspace.'}
             </div>
           </div>
         ))}
@@ -950,9 +908,7 @@ function FileNode({ node, level, activeFileId, onOpen, onToggle, onMoveFile, dra
         }}
         onClick={() => (isFolder ? onToggle(node.id) : onOpen(node.id))}
         className={`group flex h-8 w-full items-center gap-2 rounded px-2 text-left text-sm transition ${
-          activeFileId === node.id
-            ? 'bg-indigo-600 text-white'
-            : 'text-[var(--app-text)] hover:bg-[var(--button-hover)]'
+          activeFileId === node.id ? 'bg-indigo-600 text-white' : 'text-[var(--app-text)] hover:bg-[var(--button-hover)]'
         } ${isFolder && draggedId ? 'ring-1 ring-inset ring-indigo-400' : ''}`}
         style={{ paddingLeft: 8 + level * 16 }}
       >
@@ -982,17 +938,7 @@ function FileNode({ node, level, activeFileId, onOpen, onToggle, onMoveFile, dra
   );
 }
 
-function TabStrip({
-  tabs,
-  activeFileId,
-  onActivate,
-  onClose,
-  renamingId,
-  renameValue,
-  setRenameValue,
-  commitRename,
-  cancelRename,
-}) {
+function TabStrip({ tabs, activeFileId, onActivate, onClose, renamingId, renameValue, setRenameValue, commitRename, cancelRename }) {
   return (
     <div className="flex h-10 min-w-0 items-end border-b border-[var(--border)] bg-[var(--panel-bg)]">
       <div className="flex min-w-0 flex-1 overflow-x-auto">
@@ -1001,15 +947,10 @@ function TabStrip({
             key={tab.id}
             onClick={() => onActivate(tab.id)}
             className={`group flex h-10 min-w-40 max-w-60 items-center gap-2 border-r border-[var(--border)] px-3 text-sm transition ${
-              activeFileId === tab.id
-                ? 'bg-[var(--editor-bg)] text-[var(--app-text)]'
-                : 'text-[var(--muted)] hover:bg-[var(--soft-bg)]'
+              activeFileId === tab.id ? 'bg-[var(--editor-bg)] text-[var(--app-text)]' : 'text-[var(--muted)] hover:bg-[var(--soft-bg)]'
             }`}
           >
-            {React.createElement(fileIcon(tab.language), {
-              size: 15,
-              className: 'text-sky-500 shrink-0',
-            })}
+            {React.createElement(fileIcon(tab.language), { size: 15, className: 'text-sky-500 shrink-0' })}
 
             {renamingId === tab.id ? (
               <input
@@ -1054,12 +995,8 @@ function EditorToolbar({ file, wordWrap, setWordWrap, fontSize, setFontSize, onR
   return (
     <div className="flex h-10 items-center justify-between border-b border-[var(--border)] bg-[var(--editor-bg)] px-3 text-xs text-[var(--muted)]">
       <div className="flex min-w-0 items-center gap-2">
-        <span className="truncate">
-          {file.name} - {file.language}
-        </span>
-        <span className="hidden rounded bg-emerald-500/10 px-2 py-1 text-emerald-400 md:inline">
-          live editable
-        </span>
+        <span className="truncate">{file.name} - {file.language}</span>
+        <span className="hidden rounded bg-emerald-500/10 px-2 py-1 text-emerald-400 md:inline">live editable</span>
       </div>
 
       <div className="flex items-center gap-1">
@@ -1067,19 +1004,19 @@ function EditorToolbar({ file, wordWrap, setWordWrap, fontSize, setFontSize, onR
         <IconButton label="Rename file" icon={Edit3} small onClick={onRename} />
         <IconButton label="Toggle word wrap" icon={WrapText} small onClick={() => setWordWrap((value) => !value)} />
         <IconButton label="Zoom out" icon={Minus} small onClick={() => setFontSize((size) => Math.max(11, size - 1))} />
-
         <span className="flex h-7 items-center gap-1 rounded bg-[var(--soft-bg)] px-2 font-mono">
           <Type size={13} />
           {fontSize}px
         </span>
-
         <IconButton label="Zoom in" icon={Plus} small onClick={() => setFontSize((size) => Math.min(24, size + 1))} />
       </div>
     </div>
   );
 }
 
-function Editor({ file, theme, wordWrap, fontSize, onChange }) {
+function Editor({ file, theme, wordWrap, fontSize, position, onPositionChange, onChange }) {
+  const viewRef = useRef(null);
+  const restoredFileRef = useRef(null);
   const editorTheme = useMemo(() => getEditorTheme(theme), [theme]);
 
   const extensions = useMemo(() => {
@@ -1087,6 +1024,29 @@ function Editor({ file, theme, wordWrap, fontSize, onChange }) {
     if (wordWrap) list.push(EditorView.lineWrapping);
     return list;
   }, [file.language, wordWrap]);
+
+  const restorePosition = (view) => {
+    if (!view || !position || restoredFileRef.current === file.id) return;
+
+    const safeCursor = Math.min(position.cursor || 0, view.state.doc.length);
+
+    view.dispatch({
+      selection: { anchor: safeCursor },
+      effects: EditorView.scrollIntoView(safeCursor, { y: 'center' }),
+    });
+
+    requestAnimationFrame(() => {
+      view.scrollDOM.scrollTop = position.scrollTop || 0;
+      view.scrollDOM.scrollLeft = position.scrollLeft || 0;
+    });
+
+    restoredFileRef.current = file.id;
+  };
+
+  useEffect(() => {
+    restoredFileRef.current = null;
+    requestAnimationFrame(() => restorePosition(viewRef.current));
+  }, [file.id]);
 
   return (
     <div className="min-h-0 flex-1 overflow-hidden" style={{ '--editor-font-size': `${fontSize}px` }}>
@@ -1104,6 +1064,19 @@ function Editor({ file, theme, wordWrap, fontSize, onChange }) {
           closeBrackets: true,
           searchKeymap: true,
         }}
+        onCreateEditor={(view) => {
+          viewRef.current = view;
+          restorePosition(view);
+        }}
+        onUpdate={(update) => {
+          if (update.docChanged || update.selectionSet || update.scrollChanged) {
+            onPositionChange({
+              cursor: update.state.selection.main.head,
+              scrollTop: update.view.scrollDOM.scrollTop,
+              scrollLeft: update.view.scrollDOM.scrollLeft,
+            });
+          }
+        }}
         onChange={onChange}
         className="realtime-editor h-full"
       />
@@ -1118,27 +1091,15 @@ function WelcomeScreen({ onQuickOpen, onNewFile }) {
         <div className="mx-auto mb-6 grid size-24 place-items-center rounded-2xl bg-indigo-600 text-white shadow-glow">
           <Code2 size={46} />
         </div>
-
-        <p className="mb-2 text-sm font-semibold uppercase tracking-[0.28em] text-[var(--muted)]">
-          Welcome
-        </p>
-
-        <h1 className="text-4xl font-bold tracking-tight text-[var(--app-text)] sm:text-5xl">
-          AI Code Studio
-        </h1>
-
+        <p className="mb-2 text-sm font-semibold uppercase tracking-[0.28em] text-[var(--muted)]">Welcome</p>
+        <h1 className="text-4xl font-bold tracking-tight text-[var(--app-text)] sm:text-5xl">AI Code Studio</h1>
         <p className="mx-auto mt-4 max-w-md text-sm leading-6 text-[var(--muted)]">
           Your real-time frontend IDE is ready. Open a file, create a new one, or use Quick Open to start editing.
         </p>
-
         <div className="mt-7 flex flex-wrap justify-center gap-3">
-          <button
-            onClick={onQuickOpen}
-            className="rounded bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500"
-          >
+          <button onClick={onQuickOpen} className="rounded bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500">
             Quick Open
           </button>
-
           <button
             onClick={onNewFile}
             className="rounded border border-[var(--border)] bg-[var(--button-bg)] px-4 py-2 text-sm font-semibold text-[var(--app-text)] transition hover:bg-[var(--button-hover)]"
@@ -1154,12 +1115,7 @@ function WelcomeScreen({ onQuickOpen, onNewFile }) {
 function AssistantPanel({ input, onInput, mode, setMode, activeFile, messages, onAsk, inputRef }) {
   const quickInsights = activeFile
     ? inspectFile(activeFile)
-    : [
-        {
-          title: 'No file open',
-          body: 'Open a file from Explorer or Quick Open so the assistant can review your code.',
-        },
-      ];
+    : [{ title: 'No file open', body: 'Open a file from Explorer or Quick Open so the assistant can review your code.' }];
 
   return (
     <div className="flex h-full flex-col bg-[var(--panel-bg)]">
@@ -1180,9 +1136,7 @@ function AssistantPanel({ input, onInput, mode, setMode, activeFile, messages, o
             key={key}
             onClick={() => setMode(key)}
             className={`flex h-10 flex-1 items-center justify-center gap-2 rounded text-xs font-semibold transition ${
-              mode === key
-                ? 'bg-indigo-600 text-white'
-                : 'bg-[var(--button-bg)] text-[var(--app-text)] hover:bg-[var(--button-hover)]'
+              mode === key ? 'bg-indigo-600 text-white' : 'bg-[var(--button-bg)] text-[var(--app-text)] hover:bg-[var(--button-hover)]'
             }`}
           >
             <Icon size={15} />
@@ -1195,19 +1149,13 @@ function AssistantPanel({ input, onInput, mode, setMode, activeFile, messages, o
         <div className="rounded border border-[var(--border)] bg-[var(--soft-bg)] p-3 shadow-sm animate-slide-in">
           <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
             <Bot size={16} className="text-indigo-400" />
-            Live code analysis
+            Gemini streaming code analysis
           </div>
-
           <p className="text-sm leading-5 text-[var(--muted)]">
-            {activeFile ? (
-              <>
-                I am reading your current editor text from <b>{activeFile.name}</b>. Ask about mistakes, output, fixes, or completions.
-              </>
-            ) : (
-              'No file is currently open. Open a file first and I will analyze the current code in real time.'
-            )}
+            {activeFile
+              ? `I am reading your current editor text from ${activeFile.name}. Ask about mistakes, output, fixes, or completions.`
+              : 'No file is currently open. Open a file first and I will analyze the current code in real time.'}
           </p>
-
           <div className="mt-3 space-y-2">
             {quickInsights.map((item, index) => (
               <div key={index} className="rounded bg-[var(--panel-bg)] p-2 text-xs leading-5">
@@ -1223,7 +1171,7 @@ function AssistantPanel({ input, onInput, mode, setMode, activeFile, messages, o
 
         {messages.map((message, index) => (
           <div
-            key={index}
+            key={message.id || index}
             className={`rounded border p-3 text-sm leading-6 animate-slide-in ${
               message.role === 'user'
                 ? 'ml-8 border-indigo-500/30 bg-indigo-500/10'
@@ -1234,7 +1182,11 @@ function AssistantPanel({ input, onInput, mode, setMode, activeFile, messages, o
               <span>{message.role === 'user' ? 'You' : 'AI Code Assistant'}</span>
               <span>{message.time}</span>
             </div>
-            <div className="whitespace-pre-wrap">{message.text}</div>
+            {message.role === 'ai' ? (
+              <MarkdownMessage text={message.text} />
+            ) : (
+              <div className="whitespace-pre-wrap">{message.text}</div>
+            )}
           </div>
         ))}
       </div>
@@ -1248,17 +1200,23 @@ function AssistantPanel({ input, onInput, mode, setMode, activeFile, messages, o
             if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') onAsk();
           }}
           className="h-24 w-full resize-none rounded border border-[var(--border)] bg-[var(--input-bg)] p-3 text-sm outline-none ring-indigo-500/30 transition focus:ring-4"
-          placeholder="Ask about bugs, output, refactoring, or code completion..."
+          placeholder="Ask Gemini about bugs, output, refactoring, or code completion..."
         />
-
-        <button
-          onClick={onAsk}
-          className="mt-2 flex h-10 w-full items-center justify-center gap-2 rounded bg-indigo-600 px-3 text-sm font-semibold text-white transition hover:bg-indigo-500"
-        >
+        <button onClick={onAsk} className="mt-2 flex h-10 w-full items-center justify-center gap-2 rounded bg-indigo-600 px-3 text-sm font-semibold text-white transition hover:bg-indigo-500">
           <Bot size={16} />
-          Ask AI assistant
+          Ask Gemini assistant
         </button>
       </div>
+    </div>
+  );
+}
+
+function MarkdownMessage({ text }) {
+  return (
+    <div className="ai-markdown">
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+        {text}
+      </ReactMarkdown>
     </div>
   );
 }
@@ -1291,7 +1249,6 @@ function ConsolePanel({ entries, height, setHeight }) {
           <Terminal size={16} />
           Output Console
         </div>
-
         <div className="flex items-center gap-2 text-xs text-[var(--muted)]">
           <CheckCircle2 size={14} className="text-emerald-500" />
           real-time mock runner
@@ -1329,7 +1286,6 @@ function Palette({ type, files, onClose, onOpenFile, onCommand }) {
   ];
 
   const isQuick = type === 'quickOpen';
-
   const rows = isQuick
     ? files.filter((file) => file.name.toLowerCase().includes(query.toLowerCase()))
     : commands.filter((command) => command[1].toLowerCase().includes(query.toLowerCase()));
@@ -1354,10 +1310,7 @@ function Palette({ type, files, onClose, onOpenFile, onCommand }) {
         {type === 'shortcuts' ? (
           <div className="grid max-h-[60vh] gap-2 overflow-auto p-3 sm:grid-cols-2">
             {shortcutRows.map(([name, keys]) => (
-              <div
-                key={name}
-                className="flex items-center justify-between gap-3 rounded border border-[var(--border)] bg-[var(--soft-bg)] p-3 text-sm"
-              >
+              <div key={name} className="flex items-center justify-between gap-3 rounded border border-[var(--border)] bg-[var(--soft-bg)] p-3 text-sm">
                 <span>{name}</span>
                 <kbd className="rounded bg-[var(--button-bg)] px-2 py-1 font-mono text-xs">{keys}</kbd>
               </div>
@@ -1371,14 +1324,8 @@ function Palette({ type, files, onClose, onOpenFile, onCommand }) {
                 onClick={() => (isQuick ? onOpenFile(row.id) : onCommand(row[0]))}
                 className="flex h-10 w-full items-center gap-3 rounded px-3 text-left text-sm hover:bg-[var(--button-hover)]"
               >
-                {isQuick ? (
-                  <FileCode2 size={16} className="text-sky-500" />
-                ) : (
-                  <Command size={16} className="text-indigo-400" />
-                )}
-
+                {isQuick ? <FileCode2 size={16} className="text-sky-500" /> : <Command size={16} className="text-indigo-400" />}
                 <span className="min-w-0 flex-1 truncate">{isQuick ? row.name : row[1]}</span>
-
                 {!isQuick && row[2] && (
                   <kbd className="shrink-0 rounded border border-[var(--border)] bg-[var(--button-bg)] px-2 py-1 font-mono text-[11px] text-[var(--muted)]">
                     {row[2]}
@@ -1416,7 +1363,6 @@ function ResizablePanel({ width, min, max, side, onResize, children }) {
       style={{ width }}
     >
       {children}
-
       <div
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -1463,11 +1409,7 @@ function Empty({ text }) {
 function updateTree(nodes, id, updater) {
   return nodes.map((node) => {
     if (node.id === id) return updater(node);
-
-    return {
-      ...node,
-      children: node.children ? updateTree(node.children, id, updater) : node.children,
-    };
+    return { ...node, children: node.children ? updateTree(node.children, id, updater) : node.children };
   });
 }
 
@@ -1559,10 +1501,7 @@ function inspectFile(file) {
   }
 
   if (issues.length === 0) {
-    issues.push({
-      title: 'Looks stable',
-      body: 'No obvious issue was found by the mock analyzer.',
-    });
+    issues.push({ title: 'Looks stable', body: 'No obvious issue was found by the mock analyzer.' });
   }
 
   return issues.slice(0, 3);
@@ -1573,20 +1512,20 @@ function analyzeCode(file, question, mode) {
   const lower = question.toLowerCase();
 
   if (lower.includes('output') || lower.includes('result')) {
-    return `Desired output for ${file.name}:\n\n${simulateRun(file).map((entry) => `- ${entry.text}`).join('\n')}`;
+    return `## Desired output for ${file.name}\n\n${simulateRun(file).map((entry) => `- ${entry.text}`).join('\n')}`;
   }
 
   if (lower.includes('mistake') || lower.includes('bug') || lower.includes('error') || mode === 'debug') {
-    return `Mistakes or risks I found in ${file.name}:\n\n${issues
-      .map((issue, index) => `${index + 1}. ${issue.title}: ${issue.body}`)
-      .join('\n\n')}\n\nHow I would tackle them:\n- Reproduce the issue with the current file content.\n- Fix unsafe state or browser API access.\n- Run the current file again.\n- Confirm the console output is clean.`;
+    return `## Mistakes or risks in ${file.name}\n\n${issues
+      .map((issue, index) => `${index + 1}. **${issue.title}:** ${issue.body}`)
+      .join('\n\n')}\n\n## How I would tackle them\n\n- Reproduce the issue with the current file content.\n- Fix unsafe state or browser API access.\n- Run the current file again.\n- Confirm the console output is clean.`;
   }
 
   if (lower.includes('complete') || mode === 'complete') {
-    return `Suggested completion:\n\nfunction clampSize(value, min, max) {\n  return Math.max(min, Math.min(max, value));\n}\n\nUse it for editor panels and console height so stretching never creates blank gaps.`;
+    return `## Suggested completion\n\n\`\`\`js\nfunction clampSize(value, min, max) {\n  return Math.max(min, Math.min(max, value));\n}\n\`\`\`\n\nUse it for editor panels and console height so stretching never creates blank gaps.`;
   }
 
-  return `Refactor suggestion for ${file.name}:\n\nSeparate editor state, file tree operations, runner output, and AI message generation into smaller helper functions.`;
+  return `## Refactor suggestion for ${file.name}\n\nSeparate editor state, file tree operations, runner output, and AI message generation into smaller helper functions.`;
 }
 
 function simulateRun(file) {
@@ -1622,7 +1561,7 @@ function defaultConsole() {
     { type: 'command', text: '$ npm run dev' },
     { type: 'success', text: 'VITE ready at http://localhost:5173/' },
     { type: 'info', text: '[editor] CodeMirror real-time editing enabled' },
-    { type: 'log', text: '[storage] files, layout, sidebar, themes, and shortcuts are saved in localStorage' },
+    { type: 'log', text: '[storage] files, layout, sidebar, themes, shortcuts, and editor positions are saved in localStorage' },
   ];
 }
 

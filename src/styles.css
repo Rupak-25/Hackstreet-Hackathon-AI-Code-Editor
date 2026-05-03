@@ -134,6 +134,95 @@ button {
   outline: none;
 }
 
+.ai-markdown {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--app-text);
+}
+
+.ai-markdown h1,
+.ai-markdown h2,
+.ai-markdown h3 {
+  margin: 14px 0 8px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.ai-markdown h1 {
+  font-size: 20px;
+}
+
+.ai-markdown h2 {
+  font-size: 17px;
+}
+
+.ai-markdown h3 {
+  font-size: 15px;
+}
+
+.ai-markdown p {
+  margin: 8px 0;
+}
+
+.ai-markdown ul,
+.ai-markdown ol {
+  margin: 8px 0 8px 20px;
+}
+
+.ai-markdown li {
+  margin: 5px 0;
+}
+
+.ai-markdown code {
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--panel-bg);
+  padding: 2px 5px;
+  font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+  font-size: 12px;
+}
+
+.ai-markdown pre {
+  margin: 12px 0;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #05070b;
+  padding: 12px;
+}
+
+.ai-markdown pre code {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: #e5e7eb;
+}
+
+.ai-markdown blockquote {
+  margin: 10px 0;
+  border-left: 3px solid #6366f1;
+  padding-left: 12px;
+  color: var(--muted);
+}
+
+.ai-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+  font-size: 13px;
+}
+
+.ai-markdown th,
+.ai-markdown td {
+  border: 1px solid var(--border);
+  padding: 8px;
+  text-align: left;
+}
+
+.ai-markdown th {
+  background: var(--button-bg);
+}
+
 @media (max-width: 1023px) {
   body {
     overflow: auto;
