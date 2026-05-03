@@ -2,9 +2,6 @@
 
 > A modern, VS Code-inspired AI-powered code editor interface built with cutting-edge web technologies.
 
-![GitHub License](https://img.shields.io/badge/license-MIT-blue)
-![GitHub Stars](https://img.shields.io/github/stars/Rupak-25/Hackstreet-Hackathon-AI-Code-Editor?style=social)
-
 ## 🎯 Overview
 
 **AI Code Studio** is a frontend-only, feature-rich code editor interface that brings the professional development experience of VS Code to the browser. Powered by Gemini AI, it offers real-time code editing, intelligent assistance, and a beautiful, responsive IDE-like interface.
