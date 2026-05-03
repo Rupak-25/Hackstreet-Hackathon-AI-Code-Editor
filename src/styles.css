@@ -1,0 +1,146 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  overflow: hidden;
+}
+
+button,
+textarea,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  user-select: none;
+}
+
+* {
+  box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(113 113 122 / 0.45) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgb(113 113 122 / 0.35);
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+
+.app-theme-dark,
+.app-theme-dracula {
+  --app-bg: #101216;
+  --panel-bg: #11141b;
+  --editor-bg: #151820;
+  --soft-bg: #181c25;
+  --button-bg: #24242a;
+  --button-hover: #2d3340;
+  --input-bg: #15161b;
+  --border: #272b35;
+  --app-text: #f4f4f5;
+  --muted: #a1a1aa;
+}
+
+.app-theme-light {
+  --app-bg: #f4f4f5;
+  --panel-bg: #ffffff;
+  --editor-bg: #ffffff;
+  --soft-bg: #f1f5f9;
+  --button-bg: #f4f4f5;
+  --button-hover: #e4e4e7;
+  --input-bg: #ffffff;
+  --border: #d4d4d8;
+  --app-text: #18181b;
+  --muted: #52525b;
+}
+
+.app-theme-ocean {
+  --app-bg: #06131d;
+  --panel-bg: #071923;
+  --editor-bg: #081d28;
+  --soft-bg: #0d2936;
+  --button-bg: #123142;
+  --button-hover: #16465e;
+  --input-bg: #071923;
+  --border: #174358;
+  --app-text: #e0f7ff;
+  --muted: #8cc7dc;
+}
+
+.app-theme-forest {
+  --app-bg: #09140d;
+  --panel-bg: #0c1711;
+  --editor-bg: #0f1f16;
+  --soft-bg: #14261a;
+  --button-bg: #193321;
+  --button-hover: #21452c;
+  --input-bg: #0c1711;
+  --border: #25452f;
+  --app-text: #edfff1;
+  --muted: #9bc6a5;
+}
+
+.app-theme-contrast {
+  --app-bg: #000000;
+  --panel-bg: #050505;
+  --editor-bg: #000000;
+  --soft-bg: #111111;
+  --button-bg: #171717;
+  --button-hover: #262626;
+  --input-bg: #000000;
+  --border: #525252;
+  --app-text: #ffffff;
+  --muted: #d4d4d4;
+}
+
+.realtime-editor,
+.realtime-editor .cm-editor {
+  height: 100%;
+}
+
+.realtime-editor .cm-editor {
+  font-size: var(--editor-font-size, 15px);
+}
+
+.realtime-editor .cm-scroller {
+  font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+}
+
+.realtime-editor .cm-focused {
+  outline: none;
+}
+
+@media (max-width: 1023px) {
+  body {
+    overflow: auto;
+  }
+
+  .h-screen {
+    min-height: 100dvh;
+    height: 100dvh;
+  }
+}
