@@ -136,17 +136,6 @@ Choose from 6 carefully crafted themes:
 - **Forest** - Nature-inspired green tones
 - **High Contrast** - Accessible theme for better visibility
 
-## 🏗️ Project Structure
-
-```
-src/
-├── components/      # React components
-├── pages/          # Page layouts
-├── styles/         # Tailwind & custom CSS
-├── utils/          # Helper functions
-├── hooks/          # Custom React hooks
-└── App.jsx         # Main app component
-```
 
 ## 🔐 Security Note
 
